@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fall 2026 · Timetable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#ffffff;
+    --desk:#eef1f4;
+    --ink:#1b2430;
+    --muted:#6b7686;
+    --faint:#9aa4b1;
+    --hair:#eaeef2;        /* 15-min line */
+    --hair-hour:#cdd5de;   /* hour line */
+    --accent:#2a4d8f;      /* blueprint blue */
+    --row-h:19px;          /* height of one 15-min slot */
+    --rail-w:62px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Inter",system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #f6f8fb 0%, var(--desk) 60%) fixed;
+    -webkit-font-smoothing:antialiased;
+    padding:28px 18px 60px;
+  }
+  .wrap{max-width:1040px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{text-align:center;margin:6px 0 22px}
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace;
+    font-size:11px;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin-bottom:8px;
+  }
+  h1{
+    font-family:"Fraunces",Georgia,serif;
+    font-weight:600;font-size:clamp(38px,7vw,66px);
+    line-height:.95;margin:0;letter-spacing:-.01em;
+  }
+  .sub{
+    margin-top:10px;color:var(--muted);font-size:14px;
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .sub .dot{width:4px;height:4px;border-radius:50%;background:var(--faint)}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex;gap:8px;justify-content:center;flex-wrap:wrap;
+    margin:18px 0 14px;
+  }
+  button{font-family:inherit;cursor:pointer}
+  .btn{
+    border:1px solid #d6dde4;background:#fff;color:var(--ink);
+    padding:8px 14px;border-radius:9px;font-size:13px;font-weight:500;
+    transition:.15s border-color,.15s transform,.15s box-shadow;
+  }
+  .btn:hover{border-color:var(--accent)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{box-shadow:0 4px 14px rgba(42,77,143,.28)}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--ink);border-color:#d6dde4;background:#fff}
+
+  /* ---------- sheet ---------- */
+  .sheet{
+    background:var(--paper);
+    border:1px solid #e3e8ee;border-radius:16px;
+    box-shadow:0 1px 0 #fff inset, 0 18px 40px -28px rgba(27,36,48,.4);
+    overflow:auto;max-height:80vh;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:var(--rail-w) repeat(5, minmax(116px,1fr));
+    min-width:680px;
+  }
+  /* header cells */
+  .hcell{
+    position:sticky;top:0;z-index:20;
+    background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--hair-hour);
+    padding:12px 6px;text-align:center;
+  }
+  .hcell .day{font-weight:600;font-size:14px;letter-spacing:.02em}
+  .hcell .dnum{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--faint);margin-top:2px}
+  .corner{
+    position:sticky;top:0;left:0;z-index:30;
+    background:rgba(255,255,255,.95);border-bottom:1px solid var(--hair-hour);
+    border-right:1px solid var(--hair);
+  }
+  .corner .lbl{
+    font-family:"JetBrains Mono",monospace;font-size:9px;color:var(--faint);
+    transform:rotate(0);text-align:center;padding-top:18px;letter-spacing:.1em;
+  }
+
+  /* time rail */
+  .rail{
+    position:sticky;left:0;z-index:10;
+    background:var(--paper);border-right:1px solid var(--hair);
+    position:relative;
+  }
+  .rail .tick{
+    position:absolute;left:0;right:0;padding-right:7px;text-align:right;
+    font-family:"JetBrains Mono",monospace;line-height:1;
+    transform:translateY(-50%);
+  }
+  .rail .tick.hour{color:var(--ink);font-size:11px;font-weight:600}
+  .rail .tick.q{color:var(--faint);font-size:9px}
+
+  /* day columns */
+  .col{position:relative;border-right:1px solid var(--hair);cursor:crosshair}
+  .col:last-child{border-right:none}
+  .col:hover{background:#fafbfd}
+
+  /* now line */
+  .now{position:absolute;left:0;right:0;height:0;border-top:2px solid #d6453f;z-index:6;pointer-events:none}
+  .now::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#d6453f}
+
+  /* event blocks */
+  .event{
+    position:absolute;border-radius:7px;padding:5px 7px;overflow:hidden;
+    border:1px solid;cursor:pointer;z-index:5;
+    transition:.12s transform,.12s box-shadow;
+    display:flex;flex-direction:column;gap:1px;
+  }
+  .event:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(27,36,48,.5);z-index:7}
+  .event .nm{font-size:12px;font-weight:600;line-height:1.15;white-space:normal;word-break:break-word}
+  .event .mt{font-family:"JetBrains Mono",monospace;font-size:9.5px;opacity:.8;line-height:1.1}
+  .event .lc{font-size:10px;opacity:.85;line-height:1.15}
+
+  /* empty hint */
+  .hint{
+    position:absolute;left:50%;top:120px;transform:translateX(-50%);
+    text-align:center;color:var(--faint);pointer-events:none;z-index:4;width:80%;
+  }
+  .hint .big{font-family:"Fraunces",serif;font-size:18px;color:var(--muted)}
+  .hint .sm{font-size:13px;margin-top:6px}
+
+  /* ---------- modal ---------- */
+  .backdrop{
+    position:fixed;inset:0;background:rgba(27,36,48,.34);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:18px;
+    backdrop-filter:blur(2px);
+  }
+  .backdrop.open{display:flex}
+  .modal{
+    background:#fff;border-radius:16px;width:100%;max-width:380px;
+    box-shadow:0 30px 60px -20px rgba(27,36,48,.5);
+    padding:22px;animation:pop .16s ease-out;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .modal h2{font-family:"Fraunces",serif;font-weight:600;font-size:21px;margin:0 0 16px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+  .field input,.field select{
+    width:100%;padding:9px 10px;border:1px solid #d6dde4;border-radius:9px;
+    font-family:inherit;font-size:14px;color:var(--ink);background:#fff;
+  }
+  .field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap}
+  .sw{width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #d6dde4;cursor:pointer}
+  .sw.sel{box-shadow:0 0 0 2px var(--ink);transform:scale(1.08)}
+  .actions{display:flex;gap:8px;margin-top:20px}
+  .actions .btn{flex:1;justify-content:center;text-align:center}
+  .btn.danger{color:#c0392b;border-color:#eccdc8;background:#fff}
+  .btn.danger:hover{background:#fdf3f1;border-color:#c0392b}
+
+  @media (max-width:560px){
+    body{padding:18px 8px 50px}
+    .sheet{max-height:74vh;border-radius:12px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* print */
+  @media print{
+    body{background:#fff;padding:0}
+    .toolbar,.btn{display:none!important}
+    .sheet{max-height:none;box-shadow:none;border:1px solid #ccc;overflow:visible}
+    .hcell,.corner{position:static}
+    .event:hover{transform:none;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Weekly Timetable</div>
+    <h1>Fall 2026</h1>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn primary" id="addBtn">+ 수업 추가</button>
+    <button class="btn ghost" id="printBtn">인쇄 / PDF</button>
+    <button class="btn ghost" id="clearBtn">전체 지우기</button>
+  </div>
+
+  <div class="sheet">
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<!-- editor modal -->
+<div class="backdrop" id="backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h2 id="mTitle">수업 추가</h2>
+    <div class="field">
+      <label for="fCode">과목</label>
+      <input id="fCode" type="text" placeholder="예) 일반화학" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="fName">과목명</label>
+      <input id="fName" type="text" placeholder="예) 일반화학 및 실험 I" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="fLoc">장소 (선택)</label>
+      <input id="fLoc" type="text" placeholder="예) 과학관 304" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="fDay">요일</label>
+      <select id="fDay"></select>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="fStart">시작</label><select id="fStart"></select></div>
+      <div class="field"><label for="fEnd">종료</label><select id="fEnd"></select></div>
+    </div>
+    <div class="field">
+      <label>색상</label>
+      <div class="swatches" id="swatches"></div>
+    </div>
+    <div class="actions">
+      <button class="btn danger" id="delBtn" style="display:none">삭제</button>
+      <button class="btn" id="cancelBtn">취소</button>
+      <button class="btn primary" id="saveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ----- config -----
+  var START_HOUR = 8, END_HOUR = 22;        // change these to adjust range
+  var SLOT = 15;                             // minutes per slot
+  var ROW_H = 19;                            // px per slot (matches --row-h)
+  var DAYS = ["월","화","수","목","금"];
+  var DAY_EN = ["Mon","Tue","Wed","Thu","Fri"];
+  var TOTAL_MIN = (END_HOUR - START_HOUR) * 60;
+  var ROWS = TOTAL_MIN / SLOT;
+  var PAD = 10;                              // breathing room so 08:00 / 22:00 aren't clipped
+  var STORE_KEY = "fall2026-timetable-v1";
+
+  var COLORS = [
+    {bg:"#dce8fb",bd:"#9fc0f2",tx:"#1e3a6b"}, // blue
+    {bg:"#dceFe0",bd:"#a4d2ae",tx:"#245c36"}, // green
+    {bg:"#fbefd0",bd:"#e9cf95",tx:"#6b5114"}, // amber
+    {bg:"#fadddd",bd:"#ecafaf",tx:"#7a2e2e"}, // rose
+    {bg:"#e7def7",bd:"#c3ade8",tx:"#4a2c7a"}, // purple
+    {bg:"#d5eded",bd:"#97d2d2",tx:"#15595a"}, // teal
+    {bg:"#f1e0d2",bd:"#dcbe9f",tx:"#6e4a2a"}, // clay
+    {bg:"#e1e6ec",bd:"#b4c0cd",tx:"#34414f"}  // slate
+  ];
+
+  // ----- state + storage (try/catch so it works on GitHub Pages and degrades safely) -----
+  var courses = load();
+  var editingId = null;
+  var pickedColor = 0;
+
+  function load(){
+    try{ var raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : []; }
+    catch(e){ return []; }
+  }
+  function save(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(courses)); }catch(e){/* preview: in-memory only */}
+  }
+
+  // ----- time helpers -----
+  function toMin(hhmm){ var p = hhmm.split(":"); return (+p[0])*60 + (+p[1]); }
+  function fromMin(m){ var h=Math.floor(m/60), mm=m%60; return pad(h)+":"+pad(mm); }
+  function pad(n){ return n<10? "0"+n : ""+n; }
+  function topPx(min){ return PAD + ((min - START_HOUR*60)/SLOT) * ROW_H; }
+
+  // ----- build grid skeleton -----
+  var grid = document.getElementById("grid");
+
+  function buildSkeleton(){
+    grid.innerHTML = "";
+    // corner
+    var corner = el("div","corner");
+    corner.appendChild(el("div","lbl","TIME"));
+    grid.appendChild(corner);
+    // day headers
+    DAYS.forEach(function(d,i){
+      var h = el("div","hcell");
+      h.appendChild(el("div","day",d));
+      h.appendChild(el("div","dnum",DAY_EN[i]));
+      grid.appendChild(h);
+    });
+    // time rail
+    var rail = el("div","rail");
+    rail.style.height = (ROWS*ROW_H + PAD*2)+"px";
+    for(var m = START_HOUR*60; m <= END_HOUR*60; m += SLOT){
+      var isHour = (m % 60 === 0);
+      var t = el("div","tick " + (isHour?"hour":"q"));
+      t.style.top = topPx(m) + "px";
+      t.textContent = isHour ? fromMin(m) : ":"+pad(m%60);
+      if(m === END_HOUR*60 && !isHour) continue;
+      rail.appendChild(t);
+    }
+    grid.appendChild(rail);
+    // day columns
+    for(var c=0;c<5;c++){
+      var col = el("div","col");
+      col.style.height = (ROWS*ROW_H + PAD*2)+"px";
+      col.dataset.day = c;
+      col.style.backgroundImage =
+        "repeating-linear-gradient(to bottom, var(--hair) 0, var(--hair) 1px, transparent 1px, transparent "+ROW_H+"px),"+
+        "repeating-linear-gradient(to bottom, var(--hair-hour) 0, var(--hair-hour) 1px, transparent 1px, transparent "+(ROW_H*4)+"px)";
+      col.style.backgroundPosition = "0 "+PAD+"px, 0 "+PAD+"px";
+      col.addEventListener("click", onColClick);
+      grid.appendChild(col);
+    }
+  }
+
+  function el(tag,cls,txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
+
+  // ----- render events -----
+  function render(){
+    // clear existing events/now/hint
+    var cols = grid.querySelectorAll(".col");
+    cols.forEach(function(col){
+      col.querySelectorAll(".event,.now,.hint").forEach(function(n){n.remove();});
+    });
+
+    if(courses.length === 0){
+      var hint = el("div","hint");
+      hint.appendChild(el("div","big","아직 수업이 없어요"));
+      hint.appendChild(el("div","sm","빈 칸을 누르면 그 시간에 수업이 추가됩니다"));
+      cols[1].appendChild(hint); // 화요일 컬럼 가운데쯤
+    }
+
+    for(var d=0; d<5; d++){
+      var list = courses.filter(function(c){return c.day===d;})
+        .map(function(c){ return {ref:c, startMin:toMin(c.start), endMin:toMin(c.end)}; });
+      layout(list);
+      list.forEach(function(it){ cols[d].appendChild(makeEvent(it)); });
+    }
+    drawNow();
+  }
+
+  // overlap lane layout for one day
+  function layout(list){
+    list.sort(function(a,b){ return a.startMin-b.startMin || a.endMin-b.endMin; });
+    var laneEnds = [];
+    list.forEach(function(e){
+      var placed=false;
+      for(var i=0;i<laneEnds.length;i++){
+        if(laneEnds[i] <= e.startMin){ laneEnds[i]=e.endMin; e.col=i; placed=true; break; }
+      }
+      if(!placed){ e.col=laneEnds.length; laneEnds.push(e.endMin); }
+    });
+    // clusters of transitively-overlapping events share column count
+    var cluster=[], curEnd=-1;
+    function flush(){ if(!cluster.length)return; var cols=0; cluster.forEach(function(e){cols=Math.max(cols,e.col+1);}); cluster.forEach(function(e){e.cols=cols;}); cluster=[]; }
+    list.forEach(function(e){
+      if(cluster.length && e.startMin >= curEnd){ flush(); curEnd=-1; }
+      cluster.push(e); curEnd=Math.max(curEnd, e.endMin);
+    });
+    flush();
+  }
+
+  function makeEvent(it){
+    var c = it.ref, col = COLORS[c.color] || COLORS[0];
+    var e = el("div","event");
+    e.style.top = topPx(it.startMin)+"px";
+    e.style.height = Math.max(((it.endMin-it.startMin)/SLOT*ROW_H) - 2, 16)+"px";
+    var gap = 3;
+    var w = 100/it.cols;
+    e.style.left = "calc("+(w*it.col)+"% + "+gap+"px)";
+    e.style.width = "calc("+w+"% - "+(gap*2)+"px)";
+    e.style.background = col.bg; e.style.borderColor = col.bd; e.style.color = col.tx;
+    var dur = it.endMin - it.startMin;
+    // 화면에는 과목 + 장소만 표시
+    e.appendChild(el("div","nm", c.code || c.name || "수업"));
+    if(c.loc && dur >= 30) e.appendChild(el("div","lc", c.loc));
+    // 마우스를 올리면 과목명 전체가 보이도록
+    var tip = (c.name||"") + (c.loc? " · "+c.loc : "") + "\n"+c.start+"–"+c.end;
+    e.title = tip.trim();
+    e.addEventListener("click", function(ev){ ev.stopPropagation(); openEditor(c); });
+    return e;
+  }
+
+  // ----- now line -----
+  function drawNow(){
+    var now = new Date();
+    var dow = (now.getDay()+6)%7; // Mon=0
+    if(dow>4) return;
+    var mins = now.getHours()*60 + now.getMinutes();
+    if(mins < START_HOUR*60 || mins > END_HOUR*60) return;
+    var col = grid.querySelectorAll(".col")[dow];
+    var line = el("div","now");
+    line.style.top = topPx(mins)+"px";
+    col.appendChild(line);
+  }
+
+  // ----- click empty slot -----
+  function onColClick(ev){
+    var col = ev.currentTarget;
+    var rect = col.getBoundingClientRect();
+    var y = ev.clientY - rect.top;
+    var slot = Math.floor((y - PAD) / ROW_H);
+    if(slot < 0) slot = 0;
+    if(slot > ROWS-1) slot = ROWS-1;
+    var startMin = START_HOUR*60 + slot*SLOT;
+    var endMin = Math.min(startMin + 60, END_HOUR*60);
+    openEditor(null, {day:+col.dataset.day, start:fromMin(startMin), end:fromMin(endMin)});
+  }
+
+  // ----- modal -----
+  var backdrop = document.getElementById("backdrop");
+  var fCode=g("fCode"), fName=g("fName"), fLoc=g("fLoc"), fDay=g("fDay"), fStart=g("fStart"), fEnd=g("fEnd");
+  var swatches=g("swatches"), delBtn=g("delBtn"), mTitle=g("mTitle");
+  function g(id){return document.getElementById(id);}
+
+  // populate selects once
+  DAYS.forEach(function(d,i){ var o=document.createElement("option"); o.value=i; o.textContent=d+"요일"; fDay.appendChild(o); });
+  for(var m=START_HOUR*60; m<=END_HOUR*60; m+=SLOT){
+    var label = fromMin(m);
+    var os=document.createElement("option"); os.value=label; os.textContent=label; fStart.appendChild(os);
+    var oe=document.createElement("option"); oe.value=label; oe.textContent=label; fEnd.appendChild(oe);
+  }
+  COLORS.forEach(function(c,i){
+    var s = el("div","sw"); s.style.background=c.bg; s.style.boxShadow="0 0 0 1px "+c.bd;
+    s.addEventListener("click", function(){ pickedColor=i; paintSwatches(); });
+    swatches.appendChild(s);
+  });
+  function paintSwatches(){
+    swatches.querySelectorAll(".sw").forEach(function(s,i){ s.classList.toggle("sel", i===pickedColor); });
+  }
+
+  function openEditor(course, preset){
+    if(course){
+      editingId = course.id;
+      mTitle.textContent = "수업 편집";
+      fCode.value=course.code||""; fName.value=course.name||""; fLoc.value=course.loc||"";
+      fDay.value=course.day; fStart.value=course.start; fEnd.value=course.end;
+      pickedColor = course.color||0;
+      delBtn.style.display="";
+    } else {
+      editingId = null;
+      mTitle.textContent = "수업 추가";
+      fCode.value=""; fName.value=""; fLoc.value="";
+      fDay.value = preset? preset.day : 0;
+      fStart.value = preset? preset.start : fromMin(START_HOUR*60);
+      fEnd.value = preset? preset.end : fromMin(START_HOUR*60+60);
+      pickedColor = courses.length % COLORS.length;
+      delBtn.style.display="none";
+    }
+    paintSwatches();
+    backdrop.classList.add("open");
+    setTimeout(function(){ fCode.focus(); }, 30);
+  }
+  function closeEditor(){ backdrop.classList.remove("open"); editingId=null; }
+
+  function saveCourse(){
+    var s = toMin(fStart.value), e = toMin(fEnd.value);
+    if(e <= s){ e = Math.min(s+SLOT, END_HOUR*60); fEnd.value = fromMin(e); }
+    var data = {
+      code: fCode.value.trim(), name: fName.value.trim(), loc: fLoc.value.trim(),
+      day:+fDay.value, start:fStart.value, end:fromMin(e), color:pickedColor
+    };
+    if(editingId){
+      courses = courses.map(function(c){ return c.id===editingId ? Object.assign({},c,data) : c; });
+    } else {
+      data.id = "c"+Date.now()+Math.floor(Math.random()*999);
+      courses.push(data);
+    }
+    save(); render(); closeEditor();
+  }
+  function deleteCourse(){
+    if(!editingId) return;
+    courses = courses.filter(function(c){ return c.id!==editingId; });
+    save(); render(); closeEditor();
+  }
+
+  // ----- wire up controls -----
+  g("saveBtn").addEventListener("click", saveCourse);
+  g("cancelBtn").addEventListener("click", closeEditor);
+  delBtn.addEventListener("click", deleteCourse);
+  g("addBtn").addEventListener("click", function(){ openEditor(null); });
+  g("printBtn").addEventListener("click", function(){ window.print(); });
+  g("clearBtn").addEventListener("click", function(){
+    if(courses.length && confirm("모든 수업을 삭제할까요?")){ courses=[]; save(); render(); }
+  });
+  backdrop.addEventListener("click", function(ev){ if(ev.target===backdrop) closeEditor(); });
+  document.addEventListener("keydown", function(ev){
+    if(ev.key==="Escape" && backdrop.classList.contains("open")) closeEditor();
+    if(ev.key==="Enter" && backdrop.classList.contains("open") && document.activeElement.tagName!=="SELECT") saveCourse();
+  });
+
+  // ----- init -----
+  buildSkeleton();
+  render();
+  setInterval(function(){ render(); }, 60000); // refresh now-line each minute
+})();
+</script>
+</body>
+</html>
